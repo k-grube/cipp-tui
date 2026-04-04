@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Box, Text, useStdout } from 'ink';
+import React, { useMemo, useState, useEffect } from 'react';
+import { Box, Text } from 'ink';
 
 export interface Column<T> {
   key: keyof T & string;
@@ -26,10 +26,15 @@ export function DataTable<T extends Record<string, any>>({
   emptyMessage = 'No data',
   maxRows,
 }: DataTableProps<T>) {
-  const { stdout } = useStdout();
-  const terminalHeight = stdout?.rows ?? 24;
+  const [terminalHeight, setTerminalHeight] = useState(() => process.stdout.rows || 24);
 
-  // Reserve rows for: tab bar(3) + search(1) + header(1) + hints(1) + status bar(3) + padding(2)
+  useEffect(() => {
+    const onResize = () => setTerminalHeight(process.stdout.rows || 24);
+    process.stdout.on('resize', onResize);
+    return () => { process.stdout.off('resize', onResize); };
+  }, []);
+
+  // Reserve rows for: tab bar(3) + search(1) + header(1) + hints(1) + status bar(3) + scroll indicators(2)
   const availableRows = maxRows ?? Math.max(5, terminalHeight - 11);
 
   // Calculate the visible window around the selected index
