@@ -17,20 +17,17 @@ vi.mock('axios', () => {
 });
 
 describe('createApiClient', () => {
-  it('creates an axios instance with the given base URL and CIPP auth headers', () => {
-    createApiClient('https://cipp.example.com/api', { userPrincipalName: 'admin@test.com' });
+  it('creates an axios instance with the given base URL and bearer token', () => {
+    createApiClient('https://cipp.example.com/api', 'test-token');
     expect(axios.create).toHaveBeenCalledWith(
       expect.objectContaining({
         baseURL: 'https://cipp.example.com/api',
         timeout: 30000,
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer test-token',
+          'Content-Type': 'application/json',
+        }),
       }),
     );
-  });
-
-  it('sets x-ms-client-principal header with base64-encoded user info', () => {
-    createApiClient('https://cipp.example.com/api', { userPrincipalName: 'admin@test.com' });
-    const callArgs = (axios.create as any).mock.calls[0][0];
-    expect(callArgs.headers['x-ms-client-principal']).toBeDefined();
-    expect(callArgs.headers['x-ms-client-principal-idp']).toBe('aad');
   });
 });

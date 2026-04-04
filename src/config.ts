@@ -11,7 +11,8 @@ export function getConfig(): Conf<AppConfig> {
         apiBaseUrl: '',
         tenantId: '',
         clientId: '',
-        authMethod: 'device-code',
+        clientSecret: '',
+        scope: '',
       },
     });
   }
@@ -20,5 +21,5 @@ export function getConfig(): Conf<AppConfig> {
 
 export function hasRequiredConfig(): boolean {
   const config = getConfig();
-  return !!(config.get('apiBaseUrl') && config.get('tenantId') && config.get('clientId'));
+  return !!(config.get('apiBaseUrl') && config.get('tenantId') && config.get('clientId') && config.get('clientSecret') && config.get('scope'));
 }

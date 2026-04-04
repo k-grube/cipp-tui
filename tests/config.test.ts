@@ -27,12 +27,16 @@ describe('config', () => {
     config.set('apiBaseUrl', 'https://example.com/api');
     config.set('tenantId', 'tenant-123');
     config.set('clientId', 'client-456');
+    config.set('clientSecret', 'secret-789');
+    config.set('scope', 'api://client-456/.default');
     expect(hasRequiredConfig()).toBe(true);
   });
 
   it('hasRequiredConfig returns false when apiBaseUrl is missing', () => {
     config.set('tenantId', 'tenant-123');
     config.set('clientId', 'client-456');
+    config.set('clientSecret', 'secret-789');
+    config.set('scope', 'api://client-456/.default');
     expect(hasRequiredConfig()).toBe(false);
   });
 });

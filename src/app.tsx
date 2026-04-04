@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Box, useInput, useApp } from 'ink';
+import { Box, Text, useInput, useApp } from 'ink';
+import { Spinner } from '@inkjs/ui';
 import { TabBar, type Tab } from './components/TabBar.js';
 import { StatusBar, type KeyHint } from './components/StatusBar.js';
 import { Setup } from './pages/Setup.js';
-import { Login } from './pages/Login.js';
 import { TenantsPage } from './pages/Tenants.js';
 import { UsersPage } from './pages/Users.js';
 import { TenantProvider, useTenant } from './hooks/useTenant.js';
 import { hasRequiredConfig } from './config.js';
-import { acquireTokenSilent } from './auth/device-code.js';
-import { createApiClient, type CippAuthHeaders } from './api/client.js';
+import { createApiClient, acquireCippToken } from './api/client.js';
 import { getConfig } from './config.js';
+import { TokenStore } from './auth/token-store.js';
 import type { AxiosInstance } from 'axios';
 
-type AppState = 'setup' | 'login' | 'ready';
+type AppState = 'setup' | 'authenticating' | 'ready' | 'error';
 
 const TABS: Tab[] = [
   { key: 'tenants', label: 'Tenants' },
@@ -23,35 +23,54 @@ const TABS: Tab[] = [
 function AppContent() {
   const { exit } = useApp();
   const { activeTenant } = useTenant();
-  const [appState, setAppState] = useState<AppState>(hasRequiredConfig() ? 'login' : 'setup');
+  const [appState, setAppState] = useState<AppState>(hasRequiredConfig() ? 'authenticating' : 'setup');
   const [activeTab, setActiveTab] = useState('tenants');
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [apiClient, setApiClient] = useState<AxiosInstance | null>(null);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    if (appState !== 'login') return;
-    import('./auth/token-store.js').then(({ TokenStore }) => {
-      const tokenStore = new TokenStore();
-      const token = tokenStore.getAccessToken();
-      const account = tokenStore.getAccount();
-      if (token) {
-        handleAuthSuccess(token, account?.username);
-      }
-    }).catch(() => {
-      // Silent auth failed — will show login page
-    });
+    if (appState !== 'authenticating') return;
+
+    const tokenStore = new TokenStore();
+    const cachedToken = tokenStore.getAccessToken();
+
+    if (cachedToken) {
+      const config = getConfig();
+      setApiClient(createApiClient(config.get('apiBaseUrl'), cachedToken));
+      setAppState('ready');
+      return;
+    }
+
+    // Acquire a new token via client credentials
+    const config = getConfig();
+    acquireCippToken(
+      config.get('tenantId'),
+      config.get('clientId'),
+      config.get('clientSecret'),
+      config.get('scope'),
+    )
+      .then((token) => {
+        tokenStore.saveTokens({
+          accessToken: token,
+          expiresOn: new Date(Date.now() + 3500 * 1000), // ~1 hour, slightly early
+          account: null,
+        });
+        setApiClient(createApiClient(config.get('apiBaseUrl'), token));
+        setAppState('ready');
+      })
+      .catch((err) => {
+        setAuthError(err instanceof Error ? err.message : 'Authentication failed');
+        setAppState('error');
+      });
   }, [appState]);
 
-  const handleAuthSuccess = (token: string, userPrincipalName?: string) => {
-    setAccessToken(token);
-    const config = getConfig();
-    setApiClient(createApiClient(config.get('apiBaseUrl'), {
-      userPrincipalName: userPrincipalName ?? 'admin@cipp-tui',
-    }));
-    setAppState('ready');
-  };
-
   useInput((input, key) => {
+    if (appState === 'error' && input === 'r') {
+      setAuthError('');
+      setAppState('authenticating');
+      return;
+    }
+
     if (appState !== 'ready') return;
 
     if (input === 'q') exit();
@@ -81,16 +100,32 @@ function AppContent() {
 
   if (appState === 'setup') {
     return React.createElement(Setup, {
-      onComplete: () => setAppState('login'),
+      onComplete: () => setAppState('authenticating'),
     });
   }
 
-  if (appState === 'login' || !apiClient) {
-    return React.createElement(Login, {
-      onSuccess: handleAuthSuccess,
-      onError: () => {},
-    });
+  if (appState === 'authenticating') {
+    return React.createElement(
+      Box,
+      { padding: 2, flexDirection: 'column' },
+      React.createElement(Text, { bold: true, color: 'cyan' }, 'CIPP TUI'),
+      React.createElement(Text, null, ''),
+      React.createElement(Spinner, { label: 'Authenticating with CIPP API...' }),
+    );
   }
+
+  if (appState === 'error') {
+    return React.createElement(
+      Box,
+      { padding: 2, flexDirection: 'column' },
+      React.createElement(Text, { bold: true, color: 'cyan' }, 'CIPP TUI'),
+      React.createElement(Text, null, ''),
+      React.createElement(Text, { color: 'red' }, `Authentication failed: ${authError}`),
+      React.createElement(Text, { dimColor: true }, 'Press r to retry or q to quit'),
+    );
+  }
+
+  if (!apiClient) return null;
 
   const tabs = TABS.map((t) => ({
     ...t,

@@ -3,31 +3,40 @@ import axiosModule, { type AxiosInstance } from 'axios';
 // Handle CJS/ESM interop — axios may be { default: fn } in some bundlers
 const axios = (axiosModule as any).default ?? axiosModule;
 
-export interface CippAuthHeaders {
-  userPrincipalName: string;
-  roles?: string[];
-}
-
-export function createApiClient(baseUrl: string, auth: CippAuthHeaders): AxiosInstance {
-  // CIPP API uses Azure SWA-style headers, not bearer tokens.
-  // We construct the x-ms-client-principal header with user details and roles.
-  const principalPayload = JSON.stringify({
-    userDetails: auth.userPrincipalName,
-    userRoles: auth.roles ?? ['authenticated', 'admin'],
-    claims: [],
-  });
-  const principalBase64 = Buffer.from(principalPayload).toString('base64');
-
+export function createApiClient(baseUrl: string, accessToken: string): AxiosInstance {
   const client = axios.create({
     baseURL: baseUrl,
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
-      'x-ms-client-principal': principalBase64,
-      'x-ms-client-principal-idp': 'aad',
-      'x-forwarded-for': '127.0.0.1',
+      'Authorization': `Bearer ${accessToken}`,
     },
   });
 
   return client;
+}
+
+/**
+ * Acquire an OAuth2 access token using client_credentials grant.
+ * Uses the CIPP app registration's Application ID and Secret.
+ */
+export async function acquireCippToken(
+  tenantId: string,
+  clientId: string,
+  clientSecret: string,
+  scope: string,
+): Promise<string> {
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  });
+
+  const response = await axios.post(tokenUrl, params.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  });
+
+  return response.data.access_token;
 }

@@ -44,5 +44,6 @@ export interface AppConfig {
   apiBaseUrl: string;
   tenantId: string;
   clientId: string;
-  authMethod: 'device-code' | 'api-key';
+  clientSecret: string;
+  scope: string;
 }
