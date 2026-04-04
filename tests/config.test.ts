@@ -23,8 +23,15 @@ describe('config', () => {
     expect(hasRequiredConfig()).toBe(false);
   });
 
-  it('hasRequiredConfig returns true when all required fields are set', () => {
+  it('hasRequiredConfig returns true for SWA mode with just a URL', () => {
+    config.set('apiBaseUrl', 'http://localhost:7071/api');
+    config.set('authMethod', 'swa');
+    expect(hasRequiredConfig()).toBe(true);
+  });
+
+  it('hasRequiredConfig returns true for OAuth mode with all fields', () => {
     config.set('apiBaseUrl', 'https://example.com/api');
+    config.set('authMethod', 'oauth');
     config.set('tenantId', 'tenant-123');
     config.set('clientId', 'client-456');
     config.set('clientSecret', 'secret-789');
@@ -33,10 +40,9 @@ describe('config', () => {
   });
 
   it('hasRequiredConfig returns false when apiBaseUrl is missing', () => {
+    config.set('authMethod', 'oauth');
     config.set('tenantId', 'tenant-123');
     config.set('clientId', 'client-456');
-    config.set('clientSecret', 'secret-789');
-    config.set('scope', 'api://client-456/.default');
     expect(hasRequiredConfig()).toBe(false);
   });
 });

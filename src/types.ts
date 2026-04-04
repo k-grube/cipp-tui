@@ -42,8 +42,13 @@ export interface ApiError {
 
 export interface AppConfig {
   apiBaseUrl: string;
+  authMethod: 'oauth' | 'swa';
+  // OAuth fields
   tenantId: string;
   clientId: string;
   clientSecret: string;
   scope: string;
+  // SWA fields
+  swaUser: string;
+  swaRoles: string;
 }

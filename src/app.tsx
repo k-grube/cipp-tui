@@ -8,7 +8,7 @@ import { TenantsPage } from './pages/Tenants.js';
 import { UsersPage } from './pages/Users.js';
 import { TenantProvider, useTenant } from './hooks/useTenant.js';
 import { hasRequiredConfig } from './config.js';
-import { createApiClient, acquireCippToken } from './api/client.js';
+import { createOAuthClient, createSwaClient, acquireCippToken } from './api/client.js';
 import { getConfig } from './config.js';
 import { TokenStore } from './auth/token-store.js';
 import type { AxiosInstance } from 'axios';
@@ -31,18 +31,28 @@ function AppContent() {
   useEffect(() => {
     if (appState !== 'authenticating') return;
 
+    const config = getConfig();
+    const method = config.get('authMethod');
+
+    if (method === 'swa') {
+      // SWA mode — no token needed, just set headers
+      const roles = (config.get('swaRoles') || 'admin,superadmin').split(',').map((r: string) => r.trim());
+      setApiClient(createSwaClient(config.get('apiBaseUrl'), config.get('swaUser') || 'admin@cipp-tui', roles));
+      setAppState('ready');
+      return;
+    }
+
+    // OAuth mode — check cached token first
     const tokenStore = new TokenStore();
     const cachedToken = tokenStore.getAccessToken();
 
     if (cachedToken) {
-      const config = getConfig();
-      setApiClient(createApiClient(config.get('apiBaseUrl'), cachedToken));
+      setApiClient(createOAuthClient(config.get('apiBaseUrl'), cachedToken));
       setAppState('ready');
       return;
     }
 
     // Acquire a new token via client credentials
-    const config = getConfig();
     acquireCippToken(
       config.get('tenantId'),
       config.get('clientId'),
@@ -52,10 +62,10 @@ function AppContent() {
       .then((token) => {
         tokenStore.saveTokens({
           accessToken: token,
-          expiresOn: new Date(Date.now() + 3500 * 1000), // ~1 hour, slightly early
+          expiresOn: new Date(Date.now() + 3500 * 1000),
           account: null,
         });
-        setApiClient(createApiClient(config.get('apiBaseUrl'), token));
+        setApiClient(createOAuthClient(config.get('apiBaseUrl'), token));
         setAppState('ready');
       })
       .catch((err) => {

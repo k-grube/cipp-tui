@@ -9,10 +9,13 @@ export function getConfig(): Conf<AppConfig> {
       projectName: 'cipp-tui',
       defaults: {
         apiBaseUrl: '',
+        authMethod: 'swa',
         tenantId: '',
         clientId: '',
         clientSecret: '',
         scope: '',
+        swaUser: 'admin@cipp-tui',
+        swaRoles: 'admin,superadmin',
       },
     });
   }
@@ -21,5 +24,10 @@ export function getConfig(): Conf<AppConfig> {
 
 export function hasRequiredConfig(): boolean {
   const config = getConfig();
-  return !!(config.get('apiBaseUrl') && config.get('tenantId') && config.get('clientId') && config.get('clientSecret') && config.get('scope'));
+  if (!config.get('apiBaseUrl') || !config.get('authMethod')) return false;
+  if (config.get('authMethod') === 'oauth') {
+    return !!(config.get('tenantId') && config.get('clientId') && config.get('clientSecret') && config.get('scope'));
+  }
+  // SWA mode just needs the URL
+  return true;
 }
