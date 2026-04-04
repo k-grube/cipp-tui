@@ -13,9 +13,9 @@ interface TenantsPageProps {
 }
 
 const columns = [
-  { key: 'displayName', label: 'Name', width: 25 },
-  { key: 'defaultDomainName', label: 'Domain', width: 30 },
-  { key: 'customerId', label: 'Tenant ID', width: 38 },
+  { key: 'displayName', label: 'Name', flexGrow: 1 },
+  { key: 'defaultDomainName', label: 'Domain', flexGrow: 1 },
+  { key: 'customerId', label: 'Tenant ID', flexGrow: 1 },
 ] as Column<Tenant>[];
 
 export function TenantsPage({ apiClient }: TenantsPageProps) {

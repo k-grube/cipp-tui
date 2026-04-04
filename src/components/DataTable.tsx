@@ -5,6 +5,7 @@ export interface Column<T> {
   key: keyof T & string;
   label: string;
   width?: number;
+  flexGrow?: number;
 }
 
 interface DataTableProps<T extends Record<string, any>> {
@@ -93,7 +94,7 @@ export function DataTable<T extends Record<string, any>>({
       ...columns.map((col) =>
         React.createElement(
           Box,
-          { key: col.key, width: col.width ?? 20 },
+          { key: col.key, ...(col.flexGrow ? { flexGrow: col.flexGrow } : { width: col.width ?? 20 }) },
           React.createElement(Text, { bold: true, underline: true, wrap: 'truncate' }, col.label),
         ),
       ),
@@ -117,11 +118,10 @@ export function DataTable<T extends Record<string, any>>({
           React.createElement(Text, { color: 'cyan' }, isSelected ? '>' : ' '),
         ),
         ...columns.map((col) => {
-          const w = col.width ?? 20;
           const val = String(row[col.key] ?? '');
           return React.createElement(
             Box,
-            { key: col.key, width: w },
+            { key: col.key, ...(col.flexGrow ? { flexGrow: col.flexGrow } : { width: col.width ?? 20 }) },
             React.createElement(
               Text,
               {
