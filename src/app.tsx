@@ -9,7 +9,7 @@ import { UsersPage } from './pages/Users.js';
 import { TenantProvider, useTenant } from './hooks/useTenant.js';
 import { hasRequiredConfig } from './config.js';
 import { acquireTokenSilent } from './auth/device-code.js';
-import { createApiClient } from './api/client.js';
+import { createApiClient, type CippAuthHeaders } from './api/client.js';
 import { getConfig } from './config.js';
 import type { AxiosInstance } from 'axios';
 
@@ -30,19 +30,24 @@ function AppContent() {
 
   useEffect(() => {
     if (appState !== 'login') return;
-    acquireTokenSilent().then((token) => {
+    import('./auth/token-store.js').then(({ TokenStore }) => {
+      const tokenStore = new TokenStore();
+      const token = tokenStore.getAccessToken();
+      const account = tokenStore.getAccount();
       if (token) {
-        handleAuthSuccess(token);
+        handleAuthSuccess(token, account?.username);
       }
     }).catch(() => {
       // Silent auth failed — will show login page
     });
   }, [appState]);
 
-  const handleAuthSuccess = (token: string) => {
+  const handleAuthSuccess = (token: string, userPrincipalName?: string) => {
     setAccessToken(token);
     const config = getConfig();
-    setApiClient(createApiClient(config.get('apiBaseUrl'), token));
+    setApiClient(createApiClient(config.get('apiBaseUrl'), {
+      userPrincipalName: userPrincipalName ?? 'admin@cipp-tui',
+    }));
     setAppState('ready');
   };
 

@@ -4,7 +4,7 @@ import { Spinner, StatusMessage } from '@inkjs/ui';
 import { loginWithDeviceCode, type DeviceCodeInfo } from '../auth/device-code.js';
 
 interface LoginProps {
-  onSuccess: (accessToken: string) => void;
+  onSuccess: (accessToken: string, userPrincipalName?: string) => void;
   onError: (error: string) => void;
 }
 
@@ -25,7 +25,7 @@ export function Login({ onSuccess, onError }: LoginProps) {
       .then((result) => {
         if (!cancelled) {
           setStatus('success');
-          onSuccess(result.accessToken);
+          onSuccess(result.accessToken, result.account?.username);
         }
       })
       .catch((err) => {
