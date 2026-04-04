@@ -23,10 +23,17 @@ const TABS: Tab[] = [
 function AppContent() {
   const { exit } = useApp();
   const { activeTenant } = useTenant();
-  const [appState, setAppState] = useState<AppState>(hasRequiredConfig() ? 'authenticating' : 'setup');
   const [activeTab, setActiveTab] = useState('tenants');
-  const [apiClient, setApiClient] = useState<AxiosInstance | null>(null);
   const [authError, setAuthError] = useState('');
+
+  // Use a ref to hold the client so it's available immediately when appState changes
+  const [state, setState] = useState<{ appState: AppState; apiClient: AxiosInstance | null }>({
+    appState: hasRequiredConfig() ? 'authenticating' : 'setup',
+    apiClient: null,
+  });
+  const { appState, apiClient } = state;
+
+  const setAppState = (newState: AppState) => setState((prev) => ({ ...prev, appState: newState }));
 
   useEffect(() => {
     if (appState !== 'authenticating') return;
@@ -35,10 +42,9 @@ function AppContent() {
     const method = config.get('authMethod');
 
     if (method === 'swa') {
-      // SWA mode — no token needed, just set headers
       const roles = (config.get('swaRoles') || 'admin,superadmin').split(',').map((r: string) => r.trim());
-      setApiClient(createSwaClient(config.get('apiBaseUrl'), config.get('swaUser') || 'admin@cipp-tui', roles));
-      setAppState('ready');
+      const client = createSwaClient(config.get('apiBaseUrl'), config.get('swaUser') || 'admin@cipp-tui', roles);
+      setState({ appState: 'ready', apiClient: client });
       return;
     }
 
@@ -47,8 +53,7 @@ function AppContent() {
     const cachedToken = tokenStore.getAccessToken();
 
     if (cachedToken) {
-      setApiClient(createOAuthClient(config.get('apiBaseUrl'), cachedToken));
-      setAppState('ready');
+      setState({ appState: 'ready', apiClient: createOAuthClient(config.get('apiBaseUrl'), cachedToken) });
       return;
     }
 
@@ -65,8 +70,7 @@ function AppContent() {
           expiresOn: new Date(Date.now() + 3500 * 1000),
           account: null,
         });
-        setApiClient(createOAuthClient(config.get('apiBaseUrl'), token));
-        setAppState('ready');
+        setState({ appState: 'ready', apiClient: createOAuthClient(config.get('apiBaseUrl'), token) });
       })
       .catch((err) => {
         setAuthError(err instanceof Error ? err.message : 'Authentication failed');
