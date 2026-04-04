@@ -34,8 +34,16 @@ export function DataTable<T extends Record<string, any>>({
     return () => { process.stdout.off('resize', onResize); };
   }, []);
 
-  // Reserve rows for: tab bar(3) + search(1) + header(1) + hints(1) + status bar(3) + scroll indicators(2)
-  const availableRows = maxRows ?? Math.max(5, terminalHeight - 11);
+  // Reserve lines for chrome:
+  //   TabBar border box:    3 (top border + content + bottom border)
+  //   Search input:         1
+  //   Table header:         1
+  //   Hints line:           1
+  //   StatusBar border box: 3 (top border + content + bottom border)
+  //   Scroll indicators:    2 (up + down)
+  //   Ink padding/extra:    2
+  //   Total:               13
+  const availableRows = maxRows ?? Math.max(3, terminalHeight - 13);
 
   // Calculate the visible window around the selected index
   const visibleData = useMemo(() => {
@@ -86,7 +94,7 @@ export function DataTable<T extends Record<string, any>>({
         React.createElement(
           Box,
           { key: col.key, width: col.width ?? 20 },
-          React.createElement(Text, { bold: true, underline: true }, col.label),
+          React.createElement(Text, { bold: true, underline: true, wrap: 'truncate' }, col.label),
         ),
       ),
     ),
@@ -108,20 +116,23 @@ export function DataTable<T extends Record<string, any>>({
           { width: 2 },
           React.createElement(Text, { color: 'cyan' }, isSelected ? '>' : ' '),
         ),
-        ...columns.map((col) =>
-          React.createElement(
+        ...columns.map((col) => {
+          const w = col.width ?? 20;
+          const val = String(row[col.key] ?? '');
+          return React.createElement(
             Box,
-            { key: col.key, width: col.width ?? 20 },
+            { key: col.key, width: w },
             React.createElement(
               Text,
               {
                 bold: isSelected,
                 color: isSelected ? 'cyan' : undefined,
+                wrap: 'truncate',
               },
-              String(row[col.key] ?? ''),
+              val,
             ),
-          ),
-        ),
+          );
+        }),
       );
     }),
     // Scroll down indicator
