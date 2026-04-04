@@ -94,21 +94,21 @@ function AppContent() {
       return;
     }
 
+    // Tab switching — only with Shift+arrow or Tab key to avoid conflicting with page navigation
+    if (key.tab) {
+      const currentIndex = TABS.findIndex((t) => t.key === activeTab);
+      const nextIndex = (currentIndex + 1) % TABS.length;
+      const nextTab = TABS[nextIndex];
+      if (nextTab.key === 'users' && !activeTenant) return;
+      setActiveTab(nextTab.key);
+    }
+
+    // Number keys for direct tab switching
     const tabIndex = parseInt(input, 10) - 1;
     if (tabIndex >= 0 && tabIndex < TABS.length) {
       const tab = TABS[tabIndex];
       if (tab.key === 'users' && !activeTenant) return;
       setActiveTab(tab.key);
-    }
-
-    if (key.leftArrow || key.rightArrow) {
-      const currentIndex = TABS.findIndex((t) => t.key === activeTab);
-      const nextIndex = key.leftArrow
-        ? Math.max(0, currentIndex - 1)
-        : Math.min(TABS.length - 1, currentIndex + 1);
-      const nextTab = TABS[nextIndex];
-      if (nextTab.key === 'users' && !activeTenant) return;
-      setActiveTab(nextTab.key);
     }
   });
 

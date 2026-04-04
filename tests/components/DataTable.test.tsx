@@ -15,7 +15,7 @@ describe('DataTable', () => {
 
   it('renders column headers', () => {
     const { lastFrame } = render(
-      React.createElement(DataTable, { columns, data, selectedIndex: 0, onSelect: () => {} }),
+      React.createElement(DataTable, { columns, data, selectedIndex: 0, onSelect: () => {}, maxRows: 10 }),
     );
     const frame = lastFrame()!;
     expect(frame).toContain('Name');
@@ -24,17 +24,19 @@ describe('DataTable', () => {
 
   it('renders data rows', () => {
     const { lastFrame } = render(
-      React.createElement(DataTable, { columns, data, selectedIndex: 0, onSelect: () => {} }),
+      React.createElement(DataTable, { columns, data, selectedIndex: 0, onSelect: () => {}, maxRows: 10 }),
     );
     const frame = lastFrame()!;
     expect(frame).toContain('Alice');
     expect(frame).toContain('Bob');
   });
 
-  it('highlights the selected row', () => {
+  it('shows selection indicator on selected row', () => {
     const { lastFrame } = render(
-      React.createElement(DataTable, { columns, data, selectedIndex: 1, onSelect: () => {} }),
+      React.createElement(DataTable, { columns, data, selectedIndex: 1, onSelect: () => {}, maxRows: 10 }),
     );
-    expect(lastFrame()!).toContain('Bob');
+    const frame = lastFrame()!;
+    expect(frame).toContain('>');
+    expect(frame).toContain('Bob');
   });
 });
