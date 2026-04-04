@@ -51,6 +51,11 @@ function AppContent() {
 
     if (input === 'q') exit();
 
+    if (input === 't') {
+      setActiveTab('tenants');
+      return;
+    }
+
     const tabIndex = parseInt(input, 10) - 1;
     if (tabIndex >= 0 && tabIndex < TABS.length) {
       const tab = TABS[tabIndex];
@@ -89,7 +94,6 @@ function AppContent() {
 
   const defaultHints: KeyHint[] = [
     { key: 't', label: 'tenant' },
-    { key: '?', label: 'help' },
     { key: 'q', label: 'quit' },
   ];
 
