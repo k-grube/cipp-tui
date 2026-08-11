@@ -18,25 +18,17 @@ export function createOAuthClient(baseUrl: string, accessToken: string): AxiosIn
 }
 
 /**
- * Create an API client using SWA-style headers (for local dev or direct SWA access).
+ * Create an API client that sends no principal at all.
+ *
+ * For the local craft container: it runs in Development, and CraftAuthMiddleware injects a dev
+ * principal from App:Auth:Dev* whenever no x-ms-client-principal header arrives. Forging one
+ * instead would skip the allowedUsers lookup and exercise a path production never takes.
  */
-export function createSwaClient(baseUrl: string, userEmail: string, roles: string[]): AxiosInstance {
-  const principalPayload = JSON.stringify({
-    userDetails: userEmail,
-    userRoles: ['authenticated', ...roles],
-    claims: [],
-  });
-  const principalBase64 = Buffer.from(principalPayload).toString('base64');
-
+export function createNoAuthClient(baseUrl: string): AxiosInstance {
   return axios.create({
     baseURL: baseUrl,
     timeout: 30000,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-ms-client-principal': principalBase64,
-      'x-ms-client-principal-idp': 'aad',
-      'x-forwarded-for': '127.0.0.1',
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 

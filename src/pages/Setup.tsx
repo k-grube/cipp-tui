@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { TextInput, Select } from '@inkjs/ui';
-import { getConfig } from '../config.js';
+import { getConfig, deriveApiBaseUrl } from '../config.js';
+import type { AppConfig } from '../types.js';
 
-type SetupStep = 'apiBaseUrl' | 'authMethod' | 'tenantId' | 'clientId' | 'clientSecret' | 'scope' | 'swaUser' | 'done';
+type SetupStep = 'apiBaseUrl' | 'authMethod' | 'tenantId' | 'clientId' | 'clientSecret' | 'scope' | 'done';
 
 interface SetupProps {
   onComplete: () => void;
@@ -11,25 +12,26 @@ interface SetupProps {
 
 export function Setup({ onComplete }: SetupProps) {
   const [step, setStep] = useState<SetupStep>('apiBaseUrl');
+  const [urlError, setUrlError] = useState('');
   const config = getConfig();
 
   const handleApiBaseUrl = (value: string) => {
-    config.set('apiBaseUrl', value.replace(/\/+$/, ''));
+    const apiBaseUrl = deriveApiBaseUrl(value);
+    if (!apiBaseUrl) {
+      setUrlError(`Could not read '${value}' as a URL.`);
+      return;
+    }
+    setUrlError('');
+    config.set('apiBaseUrl', apiBaseUrl);
     setStep('authMethod');
   };
 
   const handleAuthMethod = (value: string) => {
-    config.set('authMethod', value as 'oauth' | 'swa');
+    config.set('authMethod', value as AppConfig['authMethod']);
     if (value === 'oauth') {
       setStep('tenantId');
-    } else {
-      setStep('swaUser');
+      return;
     }
-  };
-
-  const handleSwaUser = (value: string) => {
-    config.set('swaUser', value || 'admin@cipp-tui');
-    config.set('swaRoles', 'admin,superadmin');
     setStep('done');
     onComplete();
   };
@@ -64,9 +66,10 @@ export function Setup({ onComplete }: SetupProps) {
     step === 'apiBaseUrl' && React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(Text, null, 'Enter your CIPP API base URL:'),
-      React.createElement(Text, { dimColor: true }, '(e.g., https://your-cipp.azurewebsites.net/api or http://localhost:7071/api)'),
+      React.createElement(Text, null, 'Enter your CIPP instance URL:'),
+      React.createElement(Text, { dimColor: true }, '(e.g., https://your-cipp.azurewebsites.net or http://localhost:5196)'),
       React.createElement(TextInput, { placeholder: 'https://...', onSubmit: handleApiBaseUrl }),
+      urlError && React.createElement(Text, { color: 'red' }, urlError),
     ),
 
     step === 'authMethod' && React.createElement(
@@ -75,18 +78,12 @@ export function Setup({ onComplete }: SetupProps) {
       React.createElement(Text, null, 'How do you want to authenticate?'),
       React.createElement(Select, {
         options: [
-          { label: 'SWA Headers (local dev / direct access)', value: 'swa' },
-          { label: 'OAuth Client Credentials (production API)', value: 'oauth' },
+          { label: 'Sign in with your browser (recommended)', value: 'pkce' },
+          { label: 'Client credentials (headless / CI)', value: 'oauth' },
+          { label: 'None (local craft dev container)', value: 'none' },
         ],
         onChange: handleAuthMethod,
       }),
-    ),
-
-    step === 'swaUser' && React.createElement(
-      Box,
-      { flexDirection: 'column' },
-      React.createElement(Text, null, 'Enter a user email for the SWA principal (or press Enter for default):'),
-      React.createElement(TextInput, { placeholder: 'admin@cipp-tui', onSubmit: handleSwaUser }),
     ),
 
     step === 'tenantId' && React.createElement(

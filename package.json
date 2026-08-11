@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx src/index.tsx",
+    "reset": "tsx src/index.tsx --reset",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest"

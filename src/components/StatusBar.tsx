@@ -10,9 +10,10 @@ interface StatusBarProps {
   tenantName: string | null;
   connected: boolean;
   hints: KeyHint[];
+  signedInAs?: string | null;
 }
 
-export function StatusBar({ tenantName, connected, hints }: StatusBarProps) {
+export function StatusBar({ tenantName, connected, hints, signedInAs }: StatusBarProps) {
   return React.createElement(
     Box,
     { flexDirection: 'row', borderStyle: 'single', borderTop: true, paddingX: 1 },
@@ -27,6 +28,7 @@ export function StatusBar({ tenantName, connected, hints }: StatusBarProps) {
       { color: connected ? 'green' : 'red' },
       connected ? 'Connected' : 'Disconnected',
     ),
+    signedInAs && React.createElement(Text, { dimColor: true }, `  ${signedInAs}`),
     React.createElement(Spacer, null),
     ...hints.map((hint) =>
       React.createElement(

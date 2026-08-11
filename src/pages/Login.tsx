@@ -1,44 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Spinner, StatusMessage } from '@inkjs/ui';
-import { loginWithDeviceCode, type DeviceCodeInfo } from '../auth/device-code.js';
+import { loginWithPkce, type TokenSet } from '../auth/pkce-login.js';
 
 interface LoginProps {
-  onSuccess: (accessToken: string, userPrincipalName?: string) => void;
+  apiBaseUrl: string;
+  onSuccess: (tokens: TokenSet) => void;
   onError: (error: string) => void;
 }
 
-export function Login({ onSuccess, onError }: LoginProps) {
-  const [deviceCode, setDeviceCode] = useState<DeviceCodeInfo | null>(null);
-  const [status, setStatus] = useState<'waiting' | 'polling' | 'success' | 'error'>('waiting');
+type Phase = 'discovering' | 'browser' | 'success' | 'error';
+
+export function Login({ apiBaseUrl, onSuccess, onError }: LoginProps) {
+  const [phase, setPhase] = useState<Phase>('discovering');
+  const [authorizeUrl, setAuthorizeUrl] = useState('');
+  const [resource, setResource] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
-    loginWithDeviceCode((info) => {
-      if (!cancelled) {
-        setDeviceCode(info);
-        setStatus('polling');
-      }
-    })
-      .then((result) => {
+    loginWithPkce(apiBaseUrl, {
+      onDiscovered: (discovery) => {
+        if (!cancelled) setResource(discovery.resource.resource);
+      },
+      onAuthorizeUrl: (url) => {
         if (!cancelled) {
-          setStatus('success');
-          onSuccess(result.accessToken, result.account?.username);
+          setAuthorizeUrl(url);
+          setPhase('browser');
         }
+      },
+    })
+      .then((tokens) => {
+        if (cancelled) return;
+        setPhase('success');
+        onSuccess(tokens);
       })
       .catch((err) => {
-        if (!cancelled) {
-          setStatus('error');
-          const msg = err instanceof Error ? err.message : 'Authentication failed';
-          setErrorMessage(msg);
-          onError(msg);
-        }
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'Authentication failed';
+        setPhase('error');
+        setErrorMessage(msg);
+        onError(msg);
       });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [apiBaseUrl]);
 
   return React.createElement(
     Box,
@@ -46,28 +53,25 @@ export function Login({ onSuccess, onError }: LoginProps) {
     React.createElement(Text, { bold: true, color: 'cyan' }, 'CIPP TUI — Sign In'),
     React.createElement(Text, null, ''),
 
-    status === 'waiting' && React.createElement(Spinner, { label: 'Preparing authentication...' }),
+    phase === 'discovering' && React.createElement(Spinner, { label: 'Discovering sign-in settings...' }),
 
-    status === 'polling' && deviceCode && React.createElement(
+    phase === 'browser' && React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(Text, null, 'To sign in, open a browser and go to:'),
-      React.createElement(Text, { bold: true, color: 'yellow' }, `  ${deviceCode.verificationUri}`),
+      resource && React.createElement(Text, { dimColor: true }, `Resource: ${resource}`),
       React.createElement(Text, null, ''),
-      React.createElement(Text, null, 'Enter the code:'),
-      React.createElement(Text, { bold: true, color: 'green' }, `  ${deviceCode.userCode}`),
+      React.createElement(Text, null, 'A browser window should have opened. If not, visit:'),
+      React.createElement(Text, { color: 'yellow' }, `  ${authorizeUrl}`),
       React.createElement(Text, null, ''),
-      React.createElement(Spinner, { label: 'Waiting for authentication...' }),
+      React.createElement(Spinner, { label: 'Waiting for sign-in...' }),
     ),
 
-    status === 'success' && React.createElement(
-      StatusMessage,
-      { variant: 'success', children: 'Authenticated successfully!' },
+    phase === 'success' && React.createElement(
+      StatusMessage, { variant: 'success', children: 'Signed in.' },
     ),
 
-    status === 'error' && React.createElement(
-      StatusMessage,
-      { variant: 'error', children: `Authentication failed: ${errorMessage}` },
+    phase === 'error' && React.createElement(
+      StatusMessage, { variant: 'error', children: `Sign-in failed: ${errorMessage}` },
     ),
   );
 }

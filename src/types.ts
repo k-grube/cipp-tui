@@ -42,13 +42,13 @@ export interface ApiError {
 
 export interface AppConfig {
   apiBaseUrl: string;
-  authMethod: 'oauth' | 'swa';
+  // pkce: browser sign-in, self-registering, no secret
+  // oauth: client credentials, for headless/CI
+  // none: local craft container, which injects a dev principal when no header arrives
+  authMethod: 'pkce' | 'oauth' | 'none';
   // OAuth fields
   tenantId: string;
   clientId: string;
   clientSecret: string;
   scope: string;
-  // SWA fields
-  swaUser: string;
-  swaRoles: string;
 }

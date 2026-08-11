@@ -1,5 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TokenStore } from '../../src/auth/token-store.js';
+import { TokenStore, type SaveTokensInput } from '../../src/auth/token-store.js';
+
+const SESSION = {
+  clientId: '1f1b20aa-5c1c-4448-9649-49bc8349d676',
+  tokenEndpoint: 'https://login.microsoftonline.com/tid/oauth2/v2.0/token',
+  scopes: ['https://cipp.example.net/user_impersonation', 'openid', 'offline_access'],
+};
+
+function tokens(overrides: Partial<SaveTokensInput> = {}): SaveTokensInput {
+  return {
+    accessToken: 'abc123',
+    refreshToken: 'refresh-1',
+    expiresOn: new Date(Date.now() + 3600 * 1000),
+    username: 'user@test.com',
+    ...SESSION,
+    ...overrides,
+  };
+}
 
 describe('TokenStore', () => {
   let store: TokenStore;
@@ -15,48 +32,37 @@ describe('TokenStore', () => {
 
   it('returns null when no token is stored', () => {
     expect(store.getAccessToken()).toBeNull();
+    expect(store.getRefreshToken()).toBeNull();
+    expect(store.getSession()).toBeNull();
   });
 
   it('stores and retrieves an access token', () => {
-    const expiresOn = new Date(Date.now() + 3600 * 1000);
-    store.saveTokens({
-      accessToken: 'abc123',
-      expiresOn,
-      account: { homeAccountId: 'user1', environment: 'login.microsoftonline.com', tenantId: 't1', username: 'user@test.com', localAccountId: 'local1' },
-    });
+    store.saveTokens(tokens());
     expect(store.getAccessToken()).toBe('abc123');
+    expect(store.getUsername()).toBe('user@test.com');
   });
 
-  it('returns null when token is expired', () => {
-    const expiresOn = new Date(Date.now() - 1000);
-    store.saveTokens({
-      accessToken: 'expired',
-      expiresOn,
-      account: { homeAccountId: 'user1', environment: 'login.microsoftonline.com', tenantId: 't1', username: 'user@test.com', localAccountId: 'local1' },
-    });
+  it('returns null for an expired access token but keeps the refresh token', () => {
+    store.saveTokens(tokens({ expiresOn: new Date(Date.now() - 1000) }));
     expect(store.getAccessToken()).toBeNull();
+    expect(store.getRefreshToken()).toBe('refresh-1');
   });
 
-  it('retrieves stored account info', () => {
-    const expiresOn = new Date(Date.now() + 3600 * 1000);
-    store.saveTokens({
-      accessToken: 'abc123',
-      expiresOn,
-      account: { homeAccountId: 'user1', environment: 'login.microsoftonline.com', tenantId: 't1', username: 'user@test.com', localAccountId: 'local1' },
-    });
-    const account = store.getAccount();
-    expect(account?.username).toBe('user@test.com');
+  it('keeps what a silent refresh needs', () => {
+    store.saveTokens(tokens());
+    expect(store.getSession()).toEqual(SESSION);
+  });
+
+  it('has no session when the client credentials path stored no token endpoint', () => {
+    store.saveTokens(tokens({ tokenEndpoint: '', refreshToken: null }));
+    expect(store.getSession()).toBeNull();
   });
 
   it('clear removes all stored data', () => {
-    const expiresOn = new Date(Date.now() + 3600 * 1000);
-    store.saveTokens({
-      accessToken: 'abc123',
-      expiresOn,
-      account: { homeAccountId: 'user1', environment: 'login.microsoftonline.com', tenantId: 't1', username: 'user@test.com', localAccountId: 'local1' },
-    });
+    store.saveTokens(tokens());
     store.clear();
     expect(store.getAccessToken()).toBeNull();
-    expect(store.getAccount()).toBeNull();
+    expect(store.getRefreshToken()).toBeNull();
+    expect(store.getUsername()).toBeNull();
   });
 });

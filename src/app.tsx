@@ -4,16 +4,18 @@ import { Spinner } from '@inkjs/ui';
 import { TabBar, type Tab } from './components/TabBar.js';
 import { StatusBar, type KeyHint } from './components/StatusBar.js';
 import { Setup } from './pages/Setup.js';
+import { Login } from './pages/Login.js';
 import { TenantsPage } from './pages/Tenants.js';
 import { UsersPage } from './pages/Users.js';
 import { TenantProvider, useTenant } from './hooks/useTenant.js';
 import { hasRequiredConfig } from './config.js';
-import { createOAuthClient, createSwaClient, acquireCippToken } from './api/client.js';
+import { createOAuthClient, createNoAuthClient, acquireCippToken } from './api/client.js';
 import { getConfig } from './config.js';
 import { TokenStore } from './auth/token-store.js';
+import { acquireTokenSilent } from './auth/pkce-login.js';
 import type { AxiosInstance } from 'axios';
 
-type AppState = 'setup' | 'authenticating' | 'ready' | 'error';
+type AppState = 'setup' | 'authenticating' | 'signing-in' | 'ready' | 'error';
 
 const TABS: Tab[] = [
   { key: 'tenants', label: 'Tenants' },
@@ -25,6 +27,7 @@ function AppContent() {
   const { activeTenant } = useTenant();
   const [activeTab, setActiveTab] = useState('tenants');
   const [authError, setAuthError] = useState('');
+  const [signedInAs, setSignedInAs] = useState<string | null>(null);
 
   // Use a ref to hold the client so it's available immediately when appState changes
   const [state, setState] = useState<{ appState: AppState; apiClient: AxiosInstance | null }>({
@@ -39,25 +42,38 @@ function AppContent() {
     if (appState !== 'authenticating') return;
 
     const config = getConfig();
+    const baseUrl = config.get('apiBaseUrl');
     const method = config.get('authMethod');
 
-    if (method === 'swa') {
-      const roles = (config.get('swaRoles') || 'admin,superadmin').split(',').map((r: string) => r.trim());
-      const client = createSwaClient(config.get('apiBaseUrl'), config.get('swaUser') || 'admin@cipp-tui', roles);
-      setState({ appState: 'ready', apiClient: client });
+    if (method === 'none') {
+      setState({ appState: 'ready', apiClient: createNoAuthClient(baseUrl) });
       return;
     }
 
-    // OAuth mode — check cached token first
+    if (method === 'pkce') {
+      // Cached or refreshable token skips the browser entirely
+      acquireTokenSilent()
+        .then((tokens) => {
+          if (!tokens) {
+            setAppState('signing-in');
+            return;
+          }
+          setSignedInAs(tokens.username);
+          setState({ appState: 'ready', apiClient: createOAuthClient(baseUrl, tokens.accessToken) });
+        })
+        .catch(() => setAppState('signing-in'));
+      return;
+    }
+
+    // OAuth client credentials — check cached token first
     const tokenStore = new TokenStore();
     const cachedToken = tokenStore.getAccessToken();
 
     if (cachedToken) {
-      setState({ appState: 'ready', apiClient: createOAuthClient(config.get('apiBaseUrl'), cachedToken) });
+      setState({ appState: 'ready', apiClient: createOAuthClient(baseUrl, cachedToken) });
       return;
     }
 
-    // Acquire a new token via client credentials
     acquireCippToken(
       config.get('tenantId'),
       config.get('clientId'),
@@ -67,10 +83,14 @@ function AppContent() {
       .then((token) => {
         tokenStore.saveTokens({
           accessToken: token,
+          refreshToken: null,
           expiresOn: new Date(Date.now() + 3500 * 1000),
-          account: null,
+          username: null,
+          clientId: config.get('clientId'),
+          tokenEndpoint: '',
+          scopes: [config.get('scope')],
         });
-        setState({ appState: 'ready', apiClient: createOAuthClient(config.get('apiBaseUrl'), token) });
+        setState({ appState: 'ready', apiClient: createOAuthClient(baseUrl, token) });
       })
       .catch((err) => {
         setAuthError(err instanceof Error ? err.message : 'Authentication failed');
@@ -82,6 +102,13 @@ function AppContent() {
     if (appState === 'error' && input === 'r') {
       setAuthError('');
       setAppState('authenticating');
+      return;
+    }
+
+    // retrying against the wrong instance just fails the same way, so offer the way back out
+    if (appState === 'error' && input === 's') {
+      setAuthError('');
+      setAppState('setup');
       return;
     }
 
@@ -118,6 +145,23 @@ function AppContent() {
     });
   }
 
+  if (appState === 'signing-in') {
+    return React.createElement(Login, {
+      apiBaseUrl: getConfig().get('apiBaseUrl'),
+      onSuccess: (tokens) => {
+        setSignedInAs(tokens.username);
+        setState({
+          appState: 'ready',
+          apiClient: createOAuthClient(getConfig().get('apiBaseUrl'), tokens.accessToken),
+        });
+      },
+      onError: (message) => {
+        setAuthError(message);
+        setAppState('error');
+      },
+    });
+  }
+
   if (appState === 'authenticating') {
     return React.createElement(
       Box,
@@ -135,7 +179,8 @@ function AppContent() {
       React.createElement(Text, { bold: true, color: 'cyan' }, 'CIPP TUI'),
       React.createElement(Text, null, ''),
       React.createElement(Text, { color: 'red' }, `Authentication failed: ${authError}`),
-      React.createElement(Text, { dimColor: true }, 'Press r to retry or q to quit'),
+      React.createElement(Text, { dimColor: true }, `Instance: ${getConfig().get('apiBaseUrl')}`),
+      React.createElement(Text, { dimColor: true }, 'Press r to retry, s to change instance, q to quit'),
     );
   }
 
@@ -165,6 +210,7 @@ function AppContent() {
       tenantName: activeTenant?.defaultDomainName ?? null,
       connected: true,
       hints: defaultHints,
+      signedInAs,
     }),
   );
 }

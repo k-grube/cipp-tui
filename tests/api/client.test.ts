@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import axios from 'axios';
-import { createOAuthClient, createSwaClient } from '../../src/api/client.js';
+import { createOAuthClient, createNoAuthClient } from '../../src/api/client.js';
 
 vi.mock('axios', () => {
   const mockAxios = {
@@ -27,16 +27,11 @@ describe('createOAuthClient', () => {
   });
 });
 
-describe('createSwaClient', () => {
-  it('creates an axios instance with SWA auth headers', () => {
-    createSwaClient('http://localhost:7071/api', 'admin@test.com', ['admin']);
-    expect(axios.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        baseURL: 'http://localhost:7071/api',
-        headers: expect.objectContaining({
-          'x-ms-client-principal-idp': 'aad',
-        }),
-      }),
-    );
+describe('createNoAuthClient', () => {
+  it('sends no principal header, letting craft inject its dev principal', () => {
+    createNoAuthClient('http://localhost:5196/api');
+    const config = vi.mocked(axios.create).mock.calls.at(-1)![0]!;
+    expect(config.baseURL).toBe('http://localhost:5196/api');
+    expect(Object.keys(config.headers!)).toEqual(['Content-Type']);
   });
 });

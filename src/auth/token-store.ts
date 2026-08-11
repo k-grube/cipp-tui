@@ -2,22 +2,29 @@ import Conf from 'conf';
 
 interface StoredTokenData {
   accessToken: string;
+  refreshToken: string | null;
   expiresOn: string;
-  account: StoredAccount | null;
+  username: string | null;
+  /** What a silent refresh needs to re-post to Entra without re-running discovery */
+  clientId: string;
+  tokenEndpoint: string;
+  scopes: string[];
 }
 
-interface StoredAccount {
-  homeAccountId: string;
-  environment: string;
-  tenantId: string;
-  username: string;
-  localAccountId: string;
+export interface SessionInfo {
+  clientId: string;
+  tokenEndpoint: string;
+  scopes: string[];
 }
 
-interface SaveTokensInput {
+export interface SaveTokensInput {
   accessToken: string;
+  refreshToken: string | null;
   expiresOn: Date;
-  account: StoredAccount | null;
+  username: string | null;
+  clientId: string;
+  tokenEndpoint: string;
+  scopes: string[];
 }
 
 export class TokenStore {
@@ -34,22 +41,43 @@ export class TokenStore {
   saveTokens(input: SaveTokensInput): void {
     this.store.set('tokens', {
       accessToken: input.accessToken,
+      refreshToken: input.refreshToken,
       expiresOn: input.expiresOn.toISOString(),
-      account: input.account,
+      username: input.username,
+      clientId: input.clientId,
+      tokenEndpoint: input.tokenEndpoint,
+      scopes: input.scopes,
     });
   }
 
   getAccessToken(): string | null {
     const tokens = this.store.get('tokens');
     if (!tokens) return null;
-    const expiresOn = new Date(tokens.expiresOn);
-    if (expiresOn <= new Date()) return null;
+    if (new Date(tokens.expiresOn) <= new Date()) return null;
     return tokens.accessToken;
   }
 
-  getAccount(): StoredAccount | null {
+  getRefreshToken(): string | null {
+    return this.store.get('tokens')?.refreshToken ?? null;
+  }
+
+  getExpiresOn(): Date | null {
     const tokens = this.store.get('tokens');
-    return tokens?.account ?? null;
+    return tokens ? new Date(tokens.expiresOn) : null;
+  }
+
+  getUsername(): string | null {
+    return this.store.get('tokens')?.username ?? null;
+  }
+
+  getSession(): SessionInfo | null {
+    const tokens = this.store.get('tokens');
+    if (!tokens?.clientId || !tokens.tokenEndpoint) return null;
+    return {
+      clientId: tokens.clientId,
+      tokenEndpoint: tokens.tokenEndpoint,
+      scopes: tokens.scopes ?? [],
+    };
   }
 
   clear(): void {
