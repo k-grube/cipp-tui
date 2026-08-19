@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .superpowers/
+docs/superpowers/
 *.tsbuildinfo
 .env
 *.local
